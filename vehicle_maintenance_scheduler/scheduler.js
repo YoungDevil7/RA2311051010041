@@ -1,22 +1,32 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const Log = require('../logging_middleware/logger');
 
 const BASE_URL = "http://20.207.122.201/evaluation-service";
-const BEARER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiYXVkIjoiaHR0cDovLzIwLjI0NC41Ni4xNDQvZXZhbHVhdGlvbi1zZXJ2aWNlIiwiZW1haWwiOiJzZDQ3NTVAc3JtaXN0LmVkdS5pbiIsImV4cCI6MTc3NzcwMTExNCwiaWF0IjoxNzc3NzAwMjE0LCJpc3MiOiJBZmZvcmQgTWVkaWNhbCBUZWNobm9sb2dpZXMgUHJpdmF0ZSBMaW1pdGVkIiwianRpIjoiODlhMWNhNjYtZGIwNS00OTkwLTgwODUtZTBjMzViY2JhODEzIiwibG9jYWxlIjoiZW4tSU4iLCJuYW1lIjoic291cnlhIHZhcm1hIGRhdGxhIiwic3ViIjoiNGIwY2FhYWItYjlmZS00ZDQwLThkYzktMTIxZTIxMmM0ZTJlIn0sImVtYWlsIjoic2Q0NzU1QHNybWlzdC5lZHUuaW4iLCJuYW1lIjoic291cnlhIHZhcm1hIGRhdGxhIiwicm9sbE5vIjoicmEyMzExMDUxMDEwMDQxIiwiYWNjZXNzQ29kZSI6IlFrYnB4SCIsImNsaWVudElEIjoiNGIwY2FhYWItYjlmZS00ZDQwLThkYzktMTIxZTIxMmM0ZTJlIiwiY2xpZW50U2VjcmV0IjoiWFhjakFlSHZnRE5idUtVTiJ9.Bi2rRECLfyCHR-SabH1zZ3FsCAwe8E2jhm3LayCnhv4";
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 async function getDepots() {
     await Log("backend", "info", "scheduler", "Fetching depots");
-    const res = await axios.get(`${BASE_URL}/depots`, {
-        headers: { 'Authorization': `Bearer ${BEARER_TOKEN}` }
-    });
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (process.env.ACCESS_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.ACCESS_TOKEN}`;
+    }
+
+    const res = await axios.get(`${BASE_URL}/depots`, { headers });
     return res.data.depots;
 }
 
 async function getVehicles(depotId) {
     await Log("backend", "info", "scheduler", `Fetching vehicles for depot ${depotId}`);
-    const res = await axios.get(`${BASE_URL}/vehicles?depotId=${depotId}`, {
-        headers: { 'Authorization': `Bearer ${BEARER_TOKEN}` }
-    });
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (process.env.ACCESS_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.ACCESS_TOKEN}`;
+    }
+
+    const res = await axios.get(`${BASE_URL}/vehicles?depotId=${depotId}`, { headers });
     return res.data.vehicles;
 }
 
@@ -44,6 +54,7 @@ async function main() {
     await Log("backend", "info", "scheduler", "Starting Vehicle Maintenance Scheduler");
 
     const depots = await getDepots();
+    const results = [];
 
     for (let depot of depots) {
         await Log("backend", "info", "scheduler", `Processing Depot ${depot.ID} - Mechanic Hours: ${depot.MechanicHours}`);
@@ -51,12 +62,95 @@ async function main() {
         const vehicles = await getVehicles(depot.ID);
         const maxImpact = knapsack(vehicles, depot.MechanicHours);
 
-        console.log(`Depot ${depot.ID} → Max Impact: ${maxImpact}`);
         await Log("backend", "info", "scheduler", `Depot ${depot.ID} → Max Impact: ${maxImpact}`);
+        results.push({ depotId: depot.ID, mechanicHours: depot.MechanicHours, maxImpact });
     }
 
     await Log("backend", "info", "scheduler", "Vehicle Maintenance Scheduler completed");
-    console.log("✅ Scheduler completed successfully.");
+    return results;
 }
 
-main().catch(console.error);
+async function runDemo() {
+    const results = await main();
+
+    const rows = results.map((result) => `
+        <tr>
+            <td>${result.depotId}</td>
+            <td>${result.mechanicHours}</td>
+            <td>${result.maxImpact}</td>
+        </tr>
+    `).join('');
+
+    const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Vehicle Maintenance Scheduler Output</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #f8fafc, #eef2ff);
+                color: #111827;
+                margin: 0;
+                padding: 32px;
+            }
+            .card {
+                max-width: 900px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 18px;
+                box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+                padding: 32px;
+            }
+            h1 {
+                margin-top: 0;
+                font-size: 28px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            th, td {
+                text-align: left;
+                padding: 14px 12px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            th {
+                background: #f9fafb;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                font-size: 13px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h1>Vehicle Maintenance Scheduler Output</h1>
+            <p>Maximum impact calculated for each depot using the 0/1 knapsack algorithm.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Depot</th>
+                        <th>Mechanic Hours</th>
+                        <th>Max Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    </body>
+    </html>`;
+
+    fs.writeFileSync(path.join(__dirname, 'scheduler_output.html'), html, 'utf8');
+}
+
+if (require.main === module) {
+    runDemo().catch((error) => Log("backend", "error", "scheduler", error.message));
+}
+
+module.exports = { main, getDepots, getVehicles, knapsack };
