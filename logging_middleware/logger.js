@@ -1,24 +1,26 @@
 const axios = require('axios');
 
-const LOG_API_URL = "http://20.207.122.201/evaluation-service/logs";
+const LOG_API = "http://20.207.122.201/evaluation-service/logs";
 
-async function Log(stack, level, packageName, message) {
+async function Log(stack, level, package, message) {
     try {
         const payload = {
             stack: stack,
             level: level,
-            package: packageName,
+            package: package,
             message: message
         };
 
-        const response = await axios.post(LOG_API_URL, payload, {
-            headers: { 'Content-Type': 'application/json' }
+        const response = await axios.post(LOG_API, payload, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
-        console.log(`[LOG] ${stack} | ${level} | ${packageName} | ${message}`);
+        console.log(`[LOG] ${stack} | ${level} | ${package} | ${message}`);
         return response.data;
     } catch (error) {
-        console.error(`[LOG FAILED] ${stack} | ${level} | ${packageName} | ${message}`);
+        console.error(`[LOG FAILED] ${stack} | ${level} | ${package} | ${message}`);
     }
 }
 
