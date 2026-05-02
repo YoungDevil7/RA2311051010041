@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backend API Demo Client</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --good: #34d399;
+      --border: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: radial-gradient(circle at top, #1e293b, var(--bg) 65%);
+      color: var(--text);
+      padding: 28px;
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+    }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    .card h2 { margin-top: 0; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin: 12px 0 8px;
+    }
+    textarea, input {
+      width: 100%;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 14px;
+      outline: none;
+    }
+    textarea { min-height: 190px; resize: vertical; }
+    button {
+      margin-top: 14px;
+      background: linear-gradient(135deg, var(--accent), #38bdf8);
+      color: white;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    pre {
+      margin: 14px 0 0;
+      background: #020617;
+      color: #d1fae5;
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 16px;
+      overflow: auto;
+      min-height: 180px;
+      white-space: pre-wrap;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .pill {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 12px;
+      color: var(--muted);
+    }
+    .pill strong { color: var(--good); display: block; margin-top: 6px; }
+    .full { grid-column: 1 / -1; }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+      .meta { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Backend API Demo Client</h1>
+    <div class="sub">Use this local client to capture request body, response, and response time from your own backend app.</div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Vehicle Scheduler</h2>
+        <label>Method</label>
+        <input value="POST" readonly />
+        <label>URL</label>
+        <input id="scheduler-url" value="http://localhost:4000/api/scheduler/compute" readonly />
+        <label>Request Body</label>
+        <textarea id="scheduler-body">{
+  "scenario": "vehicle-maintenance-scheduler"
+}</textarea>
+        <button onclick="sendScheduler()">Send Request</button>
+        <div class="meta">
+          <div class="pill">Response Time<strong id="scheduler-time">-</strong></div>
+          <div class="pill">Status<strong id="scheduler-status">-</strong></div>
+        </div>
+        <label>Response</label>
+        <pre id="scheduler-response">Waiting for request...</pre>
+      </div>
+
+      <div class="card">
+        <h2>Priority Inbox</h2>
+        <label>Method</label>
+        <input value="POST" readonly />
+        <label>URL</label>
+        <input id="priority-url" value="http://localhost:4000/api/priority/top" readonly />
+        <label>Request Body</label>
+        <textarea id="priority-body">{
+  "studentId": "1042",
+  "limit": 10
+}</textarea>
+        <button onclick="sendPriority()">Send Request</button>
+        <div class="meta">
+          <div class="pill">Response Time<strong id="priority-time">-</strong></div>
+          <div class="pill">Status<strong id="priority-status">-</strong></div>
+        </div>
+        <label>Response</label>
+        <pre id="priority-response">Waiting for request...</pre>
+      </div>
+
+      <div class="card full">
+        <h2>How to Capture</h2>
+        <div class="sub">Open this page locally, send a request, and take a screenshot showing the request body, response, and response time. The request targets your own app at localhost, not the test server.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function postJson(url, body, timeId, statusId, responseId) {
+      const started = performance.now();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const elapsed = Math.round(performance.now() - started);
+      const data = await response.json();
+      document.getElementById(timeId).textContent = `${elapsed} ms`;
+      document.getElementById(statusId).textContent = `${response.status} ${response.statusText}`;
+      document.getElementById(responseId).textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function sendScheduler() {
+      const body = JSON.parse(document.getElementById('scheduler-body').value);
+      await postJson('http://localhost:4000/api/scheduler/compute', body, 'scheduler-time', 'scheduler-status', 'scheduler-response');
+    }
+
+    async function sendPriority() {
+      const body = JSON.parse(document.getElementById('priority-body').value);
+      await postJson('http://localhost:4000/api/priority/top', body, 'priority-time', 'priority-status', 'priority-response');
+    }
+  </script>
+</body>
+</html>
